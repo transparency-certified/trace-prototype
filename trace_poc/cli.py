@@ -1,14 +1,34 @@
 """Console script for trace_poc."""
+import os
+from shutil import make_archive
 import sys
+import tempfile
 import click
+import requests
 
 
 @click.command()
-def main(args=None):
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--direct", is_flag=True)
+def main(path, direct):
     """Console script for trace_poc."""
-    click.echo("Replace this message by putting your code into "
-               "trace_poc.cli.main")
-    click.echo("See click documentation at https://click.palletsprojects.com/")
+    path = os.path.abspath(path)
+    if not os.path.isdir(path):
+        click.echo("PATH needs to be a directory")
+        return 1
+    if direct:
+        click.echo(f"{path} will be passed directly")
+    else:
+        with tempfile.NamedTemporaryFile(suffix=".zip") as tmp:
+            make_archive(tmp.name[:-4], "zip", os.path.abspath(path))
+            with requests.post(
+                "http://127.0.0.1:8000",
+                files={"file": ("random.zip", tmp)},
+                stream=True,
+            ) as r:
+                for line in r.raw:
+                    print(line.decode())
+        click.echo(click.format_filename(os.path.abspath(path)))
     return 0
 
 
