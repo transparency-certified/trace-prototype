@@ -8,6 +8,7 @@ from waitress import serve
 def main(args=None):
     """Console script for trace_poc."""
     from trace_poc.server import app
+    app.secret_key = "secret_key"
     serve(app, host="0.0.0.0", port=8000)
     return 0
 
