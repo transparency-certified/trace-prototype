@@ -16,7 +16,7 @@ TRACE POC
 
 
 
-Proposed end-to-end prototype for TRACE project design discussionsProposed end-to-end p[A[A
+Proposed end-to-end prototype for TRACE project design discussions
 
 
 * Free software: BSD license
@@ -27,6 +27,22 @@ Features
 --------
 
 * TODO
+
+How to run?
+-----------
+
+.. code-block::
+ 
+   # for client
+   virtualenv -p /usr/bin/python3 venv
+   . ./venv/bin/activate
+   pip install .
+
+   trace-poc <path_to_directory>
+
+   # for server
+   docker-compose up  # needs v2.x
+
 
 Credits
 -------
