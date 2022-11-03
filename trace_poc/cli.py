@@ -24,10 +24,11 @@ def main(path, direct):
             with requests.post(
                 "http://127.0.0.1:8000",
                 files={"file": ("random.zip", tmp)},
+                headers=None,
                 stream=True,
-            ) as r:
-                for line in r.raw:
-                    print(line.decode())
+            ) as response:
+                for line in response.iter_lines(decode_unicode=True):
+                    print(line)
         click.echo(click.format_filename(os.path.abspath(path)))
     return 0
 

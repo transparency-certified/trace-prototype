@@ -10,7 +10,13 @@ with open("README.rst") as readme_file:
 with open("HISTORY.rst") as history_file:
     history = history_file.read()
 
-requirements = ["Click>=7.0", "waitress", "flask", "requests"]
+requirements = [
+    "Click>=7.0",
+    "waitress",
+    "flask",
+    "requests",
+    "docker>=2.3.0",
+]
 
 test_requirements = [
     "pytest>=3",
@@ -30,9 +36,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
     ],
-    description=(
-        "Proposed end-to-end prototype for TRACE project design discussions."
-    ),
+    description=("Proposed end-to-end prototype for TRACE project design discussions."),
     entry_points={
         "console_scripts": [
             "trace-poc=trace_poc.cli:main",
