@@ -1,3 +1,4 @@
+"""Main TRACE PoC API layer."""
 import os
 import re
 import shutil
@@ -5,7 +6,6 @@ import signal
 import subprocess
 import uuid
 import tempfile
-import time
 
 import docker
 from flask import Flask, stream_with_context, request
@@ -15,7 +15,8 @@ TMP_PATH = os.path.join(os.environ.get("HOSTDIR", "/"), "tmp")
 
 
 def build_image(payload_zip, temp_dir):
-    yield "Start building\n"
+    """Part of the workflow resposible for building image."""
+    yield "\U0001F64F Start building\n"
     # For WT specific buildpacks we would need to inject env.json
     # with open(os.path.join(temp_dir, "environment.json")) as fp:
     #     json.dump({"config": {"buildpack": "PythonBuildPack"}}, fp)
@@ -53,11 +54,12 @@ def build_image(payload_zip, temp_dir):
     ret = container.wait()
     if ret["StatusCode"] != 0:
         return "Error building image", 500
-    yield "Finished building\n"
+    yield "\U0001F64C Finished building\n"
 
 
 def run(temp_dir):
-    yield "Start running\n"
+    """Part of the workflow running recorded run."""
+    yield "\U0001F44A Start running\n"
     entrypoint = "run.sh"  # FIXME
     cli = docker.from_env()
     container = cli.containers.create(
@@ -69,17 +71,23 @@ def run(temp_dir):
         },
     )
     cmd = [
-        os.path.join(os.path.join(os.environ.get("HOSTDIR", "/"), "usr/bin/docker")),
+        os.path.join(
+            os.path.join(os.environ.get("HOSTDIR", "/"), "usr/bin/docker")
+        ),
         "stats",
         "--format",
         '"{{.CPUPerc}},{{.MemUsage}},{{.NetIO}},{{.BlockIO}},{{.PIDs}}"',
-        container.id
+        container.id,
     ]
 
     dstats_tmppath = os.path.join(temp_dir, ".docker_stats.tmp")
     with open(dstats_tmppath, "w") as dstats_fp:
-        p1 = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
-        p2 = subprocess.Popen(["ts", '"%Y-%m-%dT%H:%M:%.S"'], stdin=p1.stdout, stdout=dstats_fp)
+        p1 = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, universal_newlines=True
+        )
+        p2 = subprocess.Popen(
+            ["ts", '"%Y-%m-%dT%H:%M:%.S"'], stdin=p1.stdout, stdout=dstats_fp
+        )
         p1.stdout.close()
 
         container.start()
@@ -106,18 +114,19 @@ def run(temp_dir):
                 outfp.write(re.sub(r"\x1b\[2J\x1b\[H", "", line))
     os.remove(dstats_tmppath)
     container.remove()
-    if ret['StatusCode'] != 0:
-        return 'Error executing recorded run', 500
-    yield "Finished running\n"
+    if ret["StatusCode"] != 0:
+        return "Error executing recorded run", 500
+    yield "\U0001F918 Finished running\n"
 
 
 def generate_tro():
-    yield "Performing the magic\n"
-    time.sleep(1)
+    """Part of the workflow generating TRO..."""
+    yield "\U0001F919 Would perform signing magic here\n"
 
 
 @stream_with_context
 def magic(payload_zip):
+    """Full workflow."""
     temp_dir = tempfile.mkdtemp(dir=TMP_PATH)
     os.chmod(temp_dir, 0o777)  # FIXME: figure out all the uid/gid dance..
     yield from build_image(payload_zip, temp_dir)
@@ -135,7 +144,9 @@ def handler():
     fname = f"/tmp/{str(uuid.uuid4())}.zip"
     if path := request.args.get("path", default="", type=str):
         # Code below is a potential security issue, better not to do it.
-        path = os.path.join(os.environ.get("HOSTDIR", "/host"), os.path.abspath(path))
+        path = os.path.join(
+            os.environ.get("HOSTDIR", "/host"), os.path.abspath(path)
+        )
         if not os.path.isdir(path):
             return f"Invalid path: {path}", 400
         shutil.make_archive(fname, "zip", path)
