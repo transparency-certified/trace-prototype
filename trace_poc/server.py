@@ -1,8 +1,10 @@
 """Main TRACE PoC API layer."""
 import os
+import random
 import re
 import shutil
 import signal
+import string
 import subprocess
 import uuid
 import tempfile
@@ -14,7 +16,7 @@ app = Flask(__name__)
 TMP_PATH = os.path.join(os.environ.get("HOSTDIR", "/"), "tmp")
 
 
-def build_image(payload_zip, temp_dir):
+def build_image(payload_zip, temp_dir, image):
     """Part of the workflow resposible for building image."""
     yield "\U0001F64F Start building\n"
     # For WT specific buildpacks we would need to inject env.json
@@ -25,14 +27,15 @@ def build_image(payload_zip, temp_dir):
     container_user = "jovyan"
     extra_args = ""
     op = "--no-run"
-    tag = "local/foo"
+    letters = string.ascii_lowercase
+    image["tag"] = f"local/{''.join(random.choice(letters) for i in range(8))}"
     r2d_cmd = (
         f"jupyter-repo2docker --engine dockercli "
         "--config='/wholetale/repo2docker_config.py' "
         f"--target-repo-dir='{target_repo_dir}' "
         f"--user-id=1000 --user-name={container_user} "
         f"--no-clean {op} --debug {extra_args} "
-        f"--image-name {tag} {temp_dir}"
+        f"--image-name {image['tag']} {temp_dir}"
     )
     volumes = {
         "/var/run/docker.sock": {"bind": "/var/run/docker.sock", "mode": "rw"},
@@ -53,17 +56,17 @@ def build_image(payload_zip, temp_dir):
         yield line.decode("utf-8")
     ret = container.wait()
     if ret["StatusCode"] != 0:
-        return "Error building image", 500
+        raise RuntimeError("Error building image")
     yield "\U0001F64C Finished building\n"
 
 
-def run(temp_dir):
+def run(temp_dir, image):
     """Part of the workflow running recorded run."""
     yield "\U0001F44A Start running\n"
     entrypoint = "run.sh"  # FIXME
     cli = docker.from_env()
     container = cli.containers.create(
-        image="local/foo",
+        image=image["tag"],
         command=f"sh {entrypoint}",
         detach=True,
         volumes={
@@ -129,8 +132,9 @@ def magic(payload_zip):
     """Full workflow."""
     temp_dir = tempfile.mkdtemp(dir=TMP_PATH)
     os.chmod(temp_dir, 0o777)  # FIXME: figure out all the uid/gid dance..
-    yield from build_image(payload_zip, temp_dir)
-    yield from run(temp_dir)
+    image = {}
+    yield from build_image(payload_zip, temp_dir, image)
+    yield from run(temp_dir, image)
     yield from generate_tro()
     payload_zip = f"{payload_zip[:-4]}_run"
     shutil.make_archive(payload_zip, "zip", temp_dir)
