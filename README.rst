@@ -38,7 +38,7 @@ How to run?
    . ./venv/bin/activate
    pip install .
 
-   trace-poc <path_to_directory>
+   trace-poc submit <path_to_directory>
 
    # for server
    docker-compose up  # needs v2.x

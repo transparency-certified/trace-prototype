@@ -63,11 +63,10 @@ def build_image(payload_zip, temp_dir, image):
 def run(temp_dir, image):
     """Part of the workflow running recorded run."""
     yield "\U0001F44A Start running\n"
-    entrypoint = "run.sh"  # FIXME
     cli = docker.from_env()
     container = cli.containers.create(
         image=image["tag"],
-        command=f"sh {entrypoint}",
+        command=f"sh {image['entrypoint']}",
         detach=True,
         volumes={
             temp_dir: {"bind": "/home/jovyan/work/workspace", "mode": "rw"},
@@ -108,7 +107,7 @@ def run(temp_dir, image):
     with open(os.path.join(temp_dir, ".stderr"), "wb") as fp:
         fp.write(container.logs(stdout=False, stderr=True))
     with open(os.path.join(temp_dir, ".entrypoint"), "w") as fp:
-        fp.write(entrypoint)
+        fp.write(image["entrypoint"])
     # Remove 'clear screen' special chars from docker stats output
     # and save it as new file
     with open(dstats_tmppath, "r") as infp:
@@ -128,11 +127,11 @@ def generate_tro():
 
 
 @stream_with_context
-def magic(payload_zip):
+def magic(payload_zip, entrypoint="run.sh"):
     """Full workflow."""
     temp_dir = tempfile.mkdtemp(dir=TMP_PATH)
     os.chmod(temp_dir, 0o777)  # FIXME: figure out all the uid/gid dance..
-    image = {}
+    image = {"entrypoint": entrypoint}
     yield from build_image(payload_zip, temp_dir, image)
     yield from run(temp_dir, image)
     yield from generate_tro()
@@ -153,7 +152,8 @@ def handler():
         )
         if not os.path.isdir(path):
             return f"Invalid path: {path}", 400
-        shutil.make_archive(fname, "zip", path)
+        shutil.make_archive(fname[:-4], "zip", path)
     if "file" in request.files:
         request.files["file"].save(fname)
-    return magic(fname)
+    entrypoint = request.args.get("entrypoint", default="run.sh", type=str)
+    return magic(fname, entrypoint=entrypoint)
