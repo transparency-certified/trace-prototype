@@ -15,13 +15,11 @@ from bdbag import bdbag_api as bdb
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 import docker
-from flask import Flask, stream_with_context, request
+from flask import Flask, stream_with_context, request, send_from_directory
 
 app = Flask(__name__)
 TMP_PATH = os.path.join(os.environ.get("HOSTDIR", "/"), "tmp")
-CERTS_PATH = os.environ.get(
-    "TRACE_CERTS_PATH", os.path.abspath("../volumes/certs")
-)
+CERTS_PATH = os.environ.get("TRACE_CERTS_PATH", os.path.abspath("../volumes/certs"))
 STORAGE_PATH = os.environ.get(
     "TRACE_STORAGE_PATH", os.path.abspath("../volumes/storage")
 )
@@ -189,3 +187,8 @@ def handler():
         request.files["file"].save(fname)
     entrypoint = request.args.get("entrypoint", default="run.sh", type=str)
     return magic(fname, entrypoint=entrypoint)
+
+
+@app.route("/run/<path:path>")
+def send_run(path):
+    return send_from_directory(STORAGE_PATH, path)

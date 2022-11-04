@@ -58,5 +58,20 @@ def submit(path, direct, entrypoint):
     return 0
 
 
+@main.command()
+@click.argument("path", type=str)
+def download(path):
+    """Download an exisiting zipball with a run."""
+    with requests.get(
+        f"http://127.0.0.1:8000/run/{path}",
+        stream=True
+    ) as response:
+        response.raise_for_status()
+        with open(os.path.join("/tmp", path), "wb") as fp:
+            for chunk in response.iter_content(chunk_size=8192):
+                fp.write(chunk)
+    click.echo(f"Run downloaded as /tmp/{path}")
+
+
 if __name__ == "__main__":
     sys.exit(main())  # pragma: no cover
