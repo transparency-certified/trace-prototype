@@ -1,5 +1,6 @@
 """Main TRACE PoC API layer."""
 import hashlib
+import json
 import os
 import random
 import re
@@ -26,6 +27,15 @@ PRIV_KEY_FILE = os.path.join(CERTS_PATH, "private_key")
 STORAGE_PATH = os.environ.get(
     "TRACE_STORAGE_PATH", os.path.abspath("../volumes/storage")
 )
+TRACE_CLAIMS_FILE = os.path.join(CERTS_PATH, "claims.json")
+if not os.path.isfile(TRACE_CLAIMS_FILE):
+    TRACE_CLAIMS = {
+        "Platform": "My awesome platform!",
+        "ProvidedBy": "Xarthisius",
+        "Features": "Ran your code with care and love (even though I would write it better...)"
+    }
+else:
+    TRACE_CLAIMS = json.load(open(TRACE_CLAIMS_FILE, "r"))
 
 if not os.path.isfile(PRIV_KEY_FILE):
     private_key = ed25519.Ed25519PrivateKey.generate()
@@ -154,7 +164,7 @@ def _get_manifest_hash(path):
 def generate_tro(payload_zip, temp_dir):
     """Part of the workflow generating TRO..."""
     yield "\U0001F45B Baging result\n"
-    bdb.make_bag(temp_dir)
+    bdb.make_bag(temp_dir, metadata=TRACE_CLAIMS.copy())
     payload_zip = f"{payload_zip[:-4]}_run"
     shutil.make_archive(payload_zip, "zip", temp_dir)
     digest = _get_manifest_hash(temp_dir).hexdigest().encode()
