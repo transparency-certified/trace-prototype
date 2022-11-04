@@ -11,7 +11,8 @@ import requests
 @click.option("--debug/--no-debug", default=False)
 def main(debug):
     """Define main command group."""
-    click.echo(f"Debug mode is {'on' if debug else 'off'}")
+    if debug:
+        click.echo("Debug mode is 'on'")
 
 
 @main.command()
@@ -39,7 +40,7 @@ def submit(path, direct, entrypoint):
         with requests.post(
             "http://127.0.0.1:8000",
             params={"entrypoint": entrypoint, "path": path},
-            stream=True
+            stream=True,
         ) as response:
             for line in response.iter_lines(decode_unicode=True):
                 print(line)
@@ -62,15 +63,29 @@ def submit(path, direct, entrypoint):
 @click.argument("path", type=str)
 def download(path):
     """Download an exisiting zipball with a run."""
-    with requests.get(
-        f"http://127.0.0.1:8000/run/{path}",
-        stream=True
-    ) as response:
+    with requests.get(f"http://127.0.0.1:8000/run/{path}", stream=True) as response:
         response.raise_for_status()
         with open(os.path.join("/tmp", path), "wb") as fp:
             for chunk in response.iter_content(chunk_size=8192):
                 fp.write(chunk)
     click.echo(f"Run downloaded as /tmp/{path}")
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True))
+def verify(path):
+    """Verify that a run is valid and signed."""
+    with requests.post(
+        "http://127.0.0.1:8000/verify",
+        files={"file": (os.path.basename(path), open(path, "rb"))},
+        stream=True,
+    ) as response:
+        try:
+            response.raise_for_status()
+            for line in response.iter_lines(decode_unicode=True):
+                print(line)
+        except requests.exceptions.HTTPError as exc:
+            print(exc, response.text)
 
 
 if __name__ == "__main__":

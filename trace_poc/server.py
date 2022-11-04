@@ -11,7 +11,9 @@ import uuid
 import tempfile
 import zipfile
 
+import bagit
 from bdbag import bdbag_api as bdb
+import cryptography.exceptions
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 import docker
@@ -20,22 +22,24 @@ from flask import Flask, stream_with_context, request, send_from_directory
 app = Flask(__name__)
 TMP_PATH = os.path.join(os.environ.get("HOSTDIR", "/"), "tmp")
 CERTS_PATH = os.environ.get("TRACE_CERTS_PATH", os.path.abspath("../volumes/certs"))
+PRIV_KEY_FILE = os.path.join(CERTS_PATH, "private_key")
 STORAGE_PATH = os.environ.get(
     "TRACE_STORAGE_PATH", os.path.abspath("../volumes/storage")
 )
 
-if not os.path.isfile("private_key"):
+if not os.path.isfile(PRIV_KEY_FILE):
     private_key = ed25519.Ed25519PrivateKey.generate()
     private_bytes = private_key.private_bytes(
         encoding=serialization.Encoding.Raw,
         format=serialization.PrivateFormat.Raw,
         encryption_algorithm=serialization.NoEncryption(),
     )
-    with open(os.path.join(CERTS_PATH, "private_key"), "wb") as fp:
+    with open(PRIV_KEY_FILE, "wb") as fp:
         fp.write(private_bytes)
 
-with open(os.path.join(CERTS_PATH, "private_key"), "rb") as fp:
+with open(PRIV_KEY_FILE, "rb") as fp:
     SIGNING_KEY = ed25519.Ed25519PrivateKey.from_private_bytes(fp.read())
+PUBLIC_KEY = SIGNING_KEY.public_key()
 
 
 def build_image(payload_zip, temp_dir, image):
@@ -139,22 +143,25 @@ def run(temp_dir, image):
     yield "\U0001F918 Finished running\n"
 
 
+def _get_manifest_hash(path):
+    manifest_hash = hashlib.md5()
+    for alg in ["md5", "sha256"]:
+        with open(f"{path}/manifest-{alg}.txt", "rb") as fp:
+            manifest_hash.update(fp.read())
+    return manifest_hash
+
+
 def generate_tro(payload_zip, temp_dir):
     """Part of the workflow generating TRO..."""
     yield "\U0001F45B Baging result\n"
-    bag = bdb.make_bag(temp_dir)
-    manifest_hash = hashlib.md5()
-    for manifest in bag.manifest_files():
-        with open(manifest, "rb") as fp:
-            manifest_hash.update(fp.read())
-
+    bdb.make_bag(temp_dir)
     payload_zip = f"{payload_zip[:-4]}_run"
     shutil.make_archive(payload_zip, "zip", temp_dir)
+    digest = _get_manifest_hash(temp_dir).hexdigest().encode()
     shutil.rmtree(temp_dir)
     yield "\U0001F4DC Signing the bag\n"
     with zipfile.ZipFile(f"{payload_zip}.zip", mode="a") as zf:
-        info = zf.getinfo("bag-info.txt")
-        info.comment = SIGNING_KEY.sign(manifest_hash.digest())
+        zf.comment = SIGNING_KEY.sign(digest)
     yield (
         "\U0001F4E9 Your magic bag is available as: "
         f"{os.path.basename(payload_zip)}.zip!\n"
@@ -189,6 +196,32 @@ def handler():
     return magic(fname, entrypoint=entrypoint)
 
 
-@app.route("/run/<path:path>")
+@app.route("/run/<path:path>", methods=["GET"])
 def send_run(path):
+    """Serve static files from storage dir."""
     return send_from_directory(STORAGE_PATH, path)
+
+
+@app.route("/verify", methods=["POST"])
+def verify_bag():
+    """Verify that uploaded bag is signed and valid."""
+    if "file" not in request.files:
+        return "No bag found", 400
+    fname = os.path.join(TMP_PATH, f"{str(uuid.uuid4())}.zip")
+    request.files["file"].save(fname)
+    temp_dir = tempfile.mkdtemp(dir=TMP_PATH)
+    shutil.unpack_archive(fname, temp_dir, "zip")
+    try:
+        bdb.validate_bag(temp_dir)
+    except bagit.BagError:
+        return "Invalid bag", 400
+    except bagit.BagValidationError:
+        return "Bag failed validation", 400
+
+    digest = _get_manifest_hash(temp_dir).hexdigest().encode()
+    with zipfile.ZipFile(fname, mode="r") as zf:
+        try:
+            PUBLIC_KEY.verify(zf.comment, digest)
+        except cryptography.exceptions.InvalidSignature:
+            return "Invalid signature", 400
+    return "\U00002728 Valid and signed bag!"
