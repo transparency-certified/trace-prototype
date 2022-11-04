@@ -4,10 +4,15 @@ services:
     build: .
     ports:
       - "8000:8000"
+    environment:
+      - TRACE_CERTS_PATH=/etc/trace_certs
+      - TRACE_STORAGE_PATH=/srv
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
       - /usr/bin/docker:/usr/bin/docker
+      - ./volumes/storage:/srv
+      - ./volumes/certs:/etc/trace_certs
     cap_add:
       - SYS_ADMIN
     security_opt:

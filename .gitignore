@@ -1,3 +1,6 @@
+volumes/certs/*
+volumes/storage/*.zip
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -1,4 +1,5 @@
 """Main TRACE PoC API layer."""
+import hashlib
 import os
 import random
 import re
@@ -8,12 +9,35 @@ import string
 import subprocess
 import uuid
 import tempfile
+import zipfile
 
+from bdbag import bdbag_api as bdb
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 import docker
 from flask import Flask, stream_with_context, request
 
 app = Flask(__name__)
 TMP_PATH = os.path.join(os.environ.get("HOSTDIR", "/"), "tmp")
+CERTS_PATH = os.environ.get(
+    "TRACE_CERTS_PATH", os.path.abspath("../volumes/certs")
+)
+STORAGE_PATH = os.environ.get(
+    "TRACE_STORAGE_PATH", os.path.abspath("../volumes/storage")
+)
+
+if not os.path.isfile("private_key"):
+    private_key = ed25519.Ed25519PrivateKey.generate()
+    private_bytes = private_key.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    with open(os.path.join(CERTS_PATH, "private_key"), "wb") as fp:
+        fp.write(private_bytes)
+
+with open(os.path.join(CERTS_PATH, "private_key"), "rb") as fp:
+    SIGNING_KEY = ed25519.Ed25519PrivateKey.from_private_bytes(fp.read())
 
 
 def build_image(payload_zip, temp_dir, image):
@@ -73,9 +97,7 @@ def run(temp_dir, image):
         },
     )
     cmd = [
-        os.path.join(
-            os.path.join(os.environ.get("HOSTDIR", "/"), "usr/bin/docker")
-        ),
+        os.path.join(os.path.join(os.environ.get("HOSTDIR", "/"), "usr/bin/docker")),
         "stats",
         "--format",
         '"{{.CPUPerc}},{{.MemUsage}},{{.NetIO}},{{.BlockIO}},{{.PIDs}}"',
@@ -84,9 +106,7 @@ def run(temp_dir, image):
 
     dstats_tmppath = os.path.join(temp_dir, ".docker_stats.tmp")
     with open(dstats_tmppath, "w") as dstats_fp:
-        p1 = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, universal_newlines=True
-        )
+        p1 = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
         p2 = subprocess.Popen(
             ["ts", '"%Y-%m-%dT%H:%M:%.S"'], stdin=p1.stdout, stdout=dstats_fp
         )
@@ -121,9 +141,26 @@ def run(temp_dir, image):
     yield "\U0001F918 Finished running\n"
 
 
-def generate_tro():
+def generate_tro(payload_zip, temp_dir):
     """Part of the workflow generating TRO..."""
-    yield "\U0001F919 Would perform signing magic here\n"
+    yield "\U0001F45B Baging result\n"
+    bag = bdb.make_bag(temp_dir)
+    manifest_hash = hashlib.md5()
+    for manifest in bag.manifest_files():
+        with open(manifest, "rb") as fp:
+            manifest_hash.update(fp.read())
+
+    payload_zip = f"{payload_zip[:-4]}_run"
+    shutil.make_archive(payload_zip, "zip", temp_dir)
+    shutil.rmtree(temp_dir)
+    yield "\U0001F4DC Signing the bag\n"
+    with zipfile.ZipFile(f"{payload_zip}.zip", mode="a") as zf:
+        info = zf.getinfo("bag-info.txt")
+        info.comment = SIGNING_KEY.sign(manifest_hash.digest())
+    yield (
+        "\U0001F4E9 Your magic bag is available as: "
+        f"{os.path.basename(payload_zip)}.zip!\n"
+    )
 
 
 @stream_with_context
@@ -134,22 +171,17 @@ def magic(payload_zip, entrypoint="run.sh"):
     image = {"entrypoint": entrypoint}
     yield from build_image(payload_zip, temp_dir, image)
     yield from run(temp_dir, image)
-    yield from generate_tro()
-    payload_zip = f"{payload_zip[:-4]}_run"
-    shutil.make_archive(payload_zip, "zip", temp_dir)
-    shutil.rmtree(temp_dir)
-    yield f"Your magic bag is available as {payload_zip}.zip!\n"
+    yield from generate_tro(payload_zip, temp_dir)
+    yield "\U0001F4A3 Done!!!"
 
 
 @app.route("/", methods=["POST"])
 def handler():
     """Either saves payload passed as body or accepts a path to a directory."""
-    fname = f"/tmp/{str(uuid.uuid4())}.zip"
+    fname = os.path.join(STORAGE_PATH, f"{str(uuid.uuid4())}.zip")
     if path := request.args.get("path", default="", type=str):
         # Code below is a potential security issue, better not to do it.
-        path = os.path.join(
-            os.environ.get("HOSTDIR", "/host"), os.path.abspath(path)
-        )
+        path = os.path.join(os.environ.get("HOSTDIR", "/host"), os.path.abspath(path))
         if not os.path.isdir(path):
             return f"Invalid path: {path}", 400
         shutil.make_archive(fname[:-4], "zip", path)
