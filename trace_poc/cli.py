@@ -3,6 +3,8 @@ import os
 from shutil import make_archive
 import sys
 import tempfile
+import zipfile
+
 import click
 import requests
 
@@ -86,6 +88,20 @@ def verify(path):
                 print(line)
         except requests.exceptions.HTTPError as exc:
             print(exc, response.text)
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True))
+def inspect(path):
+    """Inspect TRO (if any) of a run."""
+    with zipfile.ZipFile(path, "r") as zf:
+        metadata = zf.read("bag-info.txt")
+    print(f"\U0001F50D Inspecting {path}")
+    for line in metadata.decode().strip().split("\n"):
+        key, value = line.split(":", 1)
+        if key in ("Bag-Software-Agent", "BagIt-Profile-Identifier", "Payload-Oxum"):
+            continue
+        print(f"\t \U00002B50 {key} - {value.strip()}")
 
 
 if __name__ == "__main__":
