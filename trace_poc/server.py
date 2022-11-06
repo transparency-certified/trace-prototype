@@ -11,19 +11,19 @@ import subprocess
 import uuid
 import tempfile
 import zipfile
+import gnupg
 
 import bagit
 from bdbag import bdbag_api as bdb
-import cryptography.exceptions
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
 import docker
 from flask import Flask, stream_with_context, request, send_from_directory
 
 app = Flask(__name__)
 TMP_PATH = os.path.join(os.environ.get("HOSTDIR", "/"), "tmp")
 CERTS_PATH = os.environ.get("TRACE_CERTS_PATH", os.path.abspath("../volumes/certs"))
-PRIV_KEY_FILE = os.path.join(CERTS_PATH, "private_key")
+GPG_HOME = os.environ.get("GPG_HOME", "/etc/gpg")
+GPG_FINGERPRINT = os.environ.get("GPG_FINGERPRINT")
+GPG_PASSPHRASE = os.environ.get("GPG_PASSPHRASE")
 STORAGE_PATH = os.environ.get(
     "TRACE_STORAGE_PATH", os.path.abspath("../volumes/storage")
 )
@@ -37,19 +37,11 @@ if not os.path.isfile(TRACE_CLAIMS_FILE):
 else:
     TRACE_CLAIMS = json.load(open(TRACE_CLAIMS_FILE, "r"))
 
-if not os.path.isfile(PRIV_KEY_FILE):
-    private_key = ed25519.Ed25519PrivateKey.generate()
-    private_bytes = private_key.private_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PrivateFormat.Raw,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-    with open(PRIV_KEY_FILE, "wb") as fp:
-        fp.write(private_bytes)
-
-with open(PRIV_KEY_FILE, "rb") as fp:
-    SIGNING_KEY = ed25519.Ed25519PrivateKey.from_private_bytes(fp.read())
-PUBLIC_KEY = SIGNING_KEY.public_key()
+try:
+    gpg = gnupg.GPG(gnupghome=GPG_HOME)
+    GPG_KEYID = gpg.list_keys().key_map[GPG_FINGERPRINT]["keyid"]
+except KeyError:
+    raise RuntimeError("Configured GPG_FINGERPRINT not found.")
 
 
 def build_image(payload_zip, temp_dir, image):
@@ -104,6 +96,7 @@ def run(temp_dir, image):
         image=image["tag"],
         command=f"sh {image['entrypoint']}",
         detach=True,
+        network="none",
         volumes={
             temp_dir: {"bind": "/home/jovyan/work/workspace", "mode": "rw"},
         },
@@ -171,7 +164,9 @@ def generate_tro(payload_zip, temp_dir):
     shutil.rmtree(temp_dir)
     yield "\U0001F4DC Signing the bag\n"
     with zipfile.ZipFile(f"{payload_zip}.zip", mode="a") as zf:
-        zf.comment = SIGNING_KEY.sign(digest)
+        zf.comment = str(
+            gpg.sign(digest, keyid=GPG_KEYID, passphrase=GPG_PASSPHRASE, detach=False)
+        ).encode()
     yield (
         "\U0001F4E9 Your magic bag is available as: "
         f"{os.path.basename(payload_zip)}.zip!\n"
@@ -228,10 +223,15 @@ def verify_bag():
     except bagit.BagValidationError:
         return "Bag failed validation", 400
 
-    digest = _get_manifest_hash(temp_dir).hexdigest().encode()
+    sig_str = "Signature info:\n"
     with zipfile.ZipFile(fname, mode="r") as zf:
-        try:
-            PUBLIC_KEY.verify(zf.comment, digest)
-        except cryptography.exceptions.InvalidSignature:
-            return "Invalid signature", 400
-    return "\U00002728 Valid and signed bag!"
+        verified = gpg.verify(zf.comment.decode())
+        if not verified:
+            raise ValueError("Signature could not be verified")
+
+        sig_info = verified.sig_info[verified.signature_id]
+        for key in sig_info:
+            sig_str += f"\t{key}: {sig_info[key]}\n"
+
+    sig_str += "\U00002728 Valid and signed bag"
+    return sig_str
