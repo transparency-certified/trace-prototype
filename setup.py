@@ -16,7 +16,6 @@ requirements = [
     "flask",
     "requests",
     "docker>=2.3.0",
-    "cryptography",
     "bdbag",
     "python-gnupg",
 ]
