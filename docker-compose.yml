@@ -7,12 +7,16 @@ services:
     environment:
       - TRACE_CERTS_PATH=/etc/trace_certs
       - TRACE_STORAGE_PATH=/srv
+      - GPG_HOME=/etc/gpg
+      - GPG_FINGERPRINT=your_key_fingerprint
+      - GPG_PASSPHRASE=your_key_passphrase
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
       - /usr/bin/docker:/usr/bin/docker
       - ./volumes/storage:/srv
       - ./volumes/certs:/etc/trace_certs
+      - /home/ubuntu/.gnupg:/etc/gpg
     cap_add:
       - SYS_ADMIN
     security_opt:
