@@ -18,6 +18,7 @@ requirements = [
     "docker>=2.3.0",
     "cryptography",
     "bdbag",
+    "python-gnupg",
 ]
 
 test_requirements = [
