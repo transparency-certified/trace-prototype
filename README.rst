@@ -26,7 +26,21 @@ Proposed end-to-end prototype for TRACE project design discussions
 Features
 --------
 
-* TODO
+* Simple Docker-based job execution service
+
+  * Python REST API
+  * repo2docker for image building
+  * Executes runs using Docker on the host
+  * Configurable claims
+  * Uses GPG for signing
+  * Creates BagIt-base TRO 
+
+* Python command line tool
+
+  * Submit jobs to server
+  * Download TRO
+  * Inspect TRO claims 
+  * Verify TRO signature via API and using local tools 
 
 How to run?
 -----------
