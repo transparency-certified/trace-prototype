@@ -51,6 +51,7 @@ def build_image(payload_zip, temp_dir, image):
     # with open(os.path.join(temp_dir, "environment.json")) as fp:
     #     json.dump({"config": {"buildpack": "PythonBuildPack"}}, fp)
     shutil.unpack_archive(payload_zip, temp_dir, "zip")
+    _set_workdir_ownership(temp_dir)
     op = "--no-run"
     letters = string.ascii_lowercase
     image["tag"] = f"local/{''.join(random.choice(letters) for i in range(8))}"
@@ -94,7 +95,9 @@ def run(temp_dir, image):
         image=image["tag"],
         command=f"sh {image['entrypoint']}",
         detach=True,
-        network="none",
+        network_disabled=True,
+        user=image["container_user"],
+        working_dir=image["target_repo_dir"],
         volumes={
             temp_dir: {"bind": image["target_repo_dir"], "mode": "rw"},
         },
@@ -178,11 +181,19 @@ def sanitize_environment(image):
     image.setdefault("extra_args", "")
 
 
+def _set_workdir_ownership(temp_dir):
+    for root, dirs, files in os.walk(temp_dir):
+        for subdir in dirs:
+            os.chown(os.path.join(root, subdir), 1000, 1000)
+        for fname in files:
+            os.chown(os.path.join(root, fname), 1000, 1000)
+
+
 @stream_with_context
 def magic(payload_zip, image=None):
     """Full workflow."""
     temp_dir = tempfile.mkdtemp(dir=TMP_PATH)
-    os.chmod(temp_dir, 0o777)  # FIXME: figure out all the uid/gid dance..
+    os.chown(temp_dir, 1000, 1000)  # FIXME: figure out all the uid/gid dance..
     if not image:
         image = {}
     sanitize_environment(image)
