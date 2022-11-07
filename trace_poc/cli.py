@@ -31,7 +31,21 @@ def main(debug):
     show_default=True,
     default="run.sh",
 )
-def submit(path, direct, entrypoint):
+@click.option(
+    "--container-user",
+    help="User that will execute shell inside the container.",
+    type=str,
+    show_default=True,
+    default="jovyan",
+)
+@click.option(
+    "--target-repo-dir",
+    help="Path to the working directory inside the container.",
+    type=str,
+    show_default=True,
+    default="/home/jovyan/work",
+)
+def submit(path, direct, entrypoint, container_user, target_repo_dir):
     """Submit a job to a TRACE system."""
     path = os.path.abspath(path)
     if not os.path.isdir(path):
@@ -41,7 +55,12 @@ def submit(path, direct, entrypoint):
         click.echo(f"{path} will be passed directly")
         with requests.post(
             "http://127.0.0.1:8000",
-            params={"entrypoint": entrypoint, "path": path},
+            params={
+                "entrypoint": entrypoint,
+                "path": path,
+                "containerUser": container_user,
+                "targetRepoDir": target_repo_dir,
+            },
             stream=True,
         ) as response:
             for line in response.iter_lines(decode_unicode=True):
@@ -51,7 +70,11 @@ def submit(path, direct, entrypoint):
             make_archive(tmp.name[:-4], "zip", os.path.abspath(path))
             with requests.post(
                 "http://127.0.0.1:8000",
-                params={"entrypoint": entrypoint},
+                params={
+                    "entrypoint": entrypoint,
+                    "containerUser": container_user,
+                    "targetRepoDir": target_repo_dir,
+                },
                 files={"file": ("random.zip", tmp)},
                 stream=True,
             ) as response:

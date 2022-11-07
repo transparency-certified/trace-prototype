@@ -32,7 +32,7 @@ if not os.path.isfile(TRACE_CLAIMS_FILE):
     TRACE_CLAIMS = {
         "Platform": "My awesome platform!",
         "ProvidedBy": "Xarthisius",
-        "Features": "Ran your code with care and love (even though I would write it better...)"
+        "Features": "Ran your code with care and love (even though I would write it better...)",
     }
 else:
     TRACE_CLAIMS = json.load(open(TRACE_CLAIMS_FILE, "r"))
@@ -51,18 +51,15 @@ def build_image(payload_zip, temp_dir, image):
     # with open(os.path.join(temp_dir, "environment.json")) as fp:
     #     json.dump({"config": {"buildpack": "PythonBuildPack"}}, fp)
     shutil.unpack_archive(payload_zip, temp_dir, "zip")
-    target_repo_dir = "/home/jovyan/work/workspace"
-    container_user = "jovyan"
-    extra_args = ""
     op = "--no-run"
     letters = string.ascii_lowercase
     image["tag"] = f"local/{''.join(random.choice(letters) for i in range(8))}"
     r2d_cmd = (
         f"jupyter-repo2docker --engine dockercli "
         "--config='/wholetale/repo2docker_config.py' "
-        f"--target-repo-dir='{target_repo_dir}' "
-        f"--user-id=1000 --user-name={container_user} "
-        f"--no-clean {op} --debug {extra_args} "
+        f"--target-repo-dir='{image['target_repo_dir']}' "
+        f"--user-id=1000 --user-name={image['container_user']} "
+        f"--no-clean {op} --debug {image['extra_args']} "
         f"--image-name {image['tag']} {temp_dir}"
     )
     volumes = {
@@ -79,6 +76,7 @@ def build_image(payload_zip, temp_dir, image):
         detach=True,
         remove=True,
         volumes=volumes,
+        working_dir=image["target_repo_dir"],
     )
     for line in container.logs(stream=True):
         yield line.decode("utf-8")
@@ -98,7 +96,7 @@ def run(temp_dir, image):
         detach=True,
         network="none",
         volumes={
-            temp_dir: {"bind": "/home/jovyan/work/workspace", "mode": "rw"},
+            temp_dir: {"bind": image["target_repo_dir"], "mode": "rw"},
         },
     )
     cmd = [
@@ -173,12 +171,21 @@ def generate_tro(payload_zip, temp_dir):
     )
 
 
+def sanitize_environment(image):
+    image.setdefault("entrypoint", "run.sh")
+    image.setdefault("target_repo_dir", "/home/jovyan/work")
+    image.setdefault("container_user", "jovyan")
+    image.setdefault("extra_args", "")
+
+
 @stream_with_context
-def magic(payload_zip, entrypoint="run.sh"):
+def magic(payload_zip, image=None):
     """Full workflow."""
     temp_dir = tempfile.mkdtemp(dir=TMP_PATH)
     os.chmod(temp_dir, 0o777)  # FIXME: figure out all the uid/gid dance..
-    image = {"entrypoint": entrypoint}
+    if not image:
+        image = {}
+    sanitize_environment(image)
     yield from build_image(payload_zip, temp_dir, image)
     yield from run(temp_dir, image)
     yield from generate_tro(payload_zip, temp_dir)
@@ -197,8 +204,15 @@ def handler():
         shutil.make_archive(fname[:-4], "zip", path)
     if "file" in request.files:
         request.files["file"].save(fname)
-    entrypoint = request.args.get("entrypoint", default="run.sh", type=str)
-    return magic(fname, entrypoint=entrypoint)
+    image = {
+        "entrypoint": request.args.get("entrypoint", default="run.sh", type=str),
+        "container_user": request.args.get("containerUser", default="jovyan", type=str),
+        "target_repo_dir": request.args.get(
+            "targetRepoDir", default="/home/jovyan/work/workspace", type=str
+        ),
+        "extra_args": request.args.get("extraArgs", default="", type=str),
+    }
+    return magic(fname, image=image)
 
 
 @app.route("/run/<path:path>", methods=["GET"])
