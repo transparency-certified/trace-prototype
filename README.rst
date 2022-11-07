@@ -49,8 +49,24 @@ How to run?
    - GPG_PASSPHRASE=your_passphrase
    ...
 
-   # for server 
-   # Note, you may need to configure .gpg path
+   # Create volumes/certs/claims.json. For example:
+   {
+      "TRACESystem": "TRACE Prototype",
+      "TRACEVersion": "0.1",
+      "TRACEOrganization": "UIUC",
+      "DataAvailablePriorToRuntime": "Yes",
+      "DataAvailableAfterRuntime": "Yes",
+      "TROIncludesOutputs": "Yes",
+      "TROIncludesCode": "Yes",
+      "NetworkIsolation": "Yes",
+      "PreventsAuthorInteraction": "Yes",
+      "InputsFromRepository": "No",
+      "TracksIntermediateSteps": "No",
+      "IntermediateStepsLevel": "0",
+      "RuntimeEvidence": "Yes"
+   }
+
+   # Start server. Note, you may need to configure .gpg path
    docker-compose up  # needs v2.x
 
    # Clone example
