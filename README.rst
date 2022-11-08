@@ -26,7 +26,21 @@ Proposed end-to-end prototype for TRACE project design discussions
 Features
 --------
 
-* TODO
+* Simple Docker-based job execution service
+
+  * Python REST API
+  * repo2docker for image building
+  * Executes runs using Docker on the host
+  * Configurable claims
+  * Uses GPG for signing
+  * Creates BagIt-base TRO 
+
+* Python command line tool
+
+  * Submit jobs to server
+  * Download TRO
+  * Inspect TRO claims 
+  * Verify TRO signature via API and using local tools 
 
 How to run?
 -----------
@@ -49,23 +63,49 @@ How to run?
    - GPG_PASSPHRASE=your_passphrase
    ...
 
-   # for server
+   # Create volumes/certs/claims.json. For example:
+   {
+      "TRACESystem": "TRACE Prototype",
+      "TRACEVersion": "0.1",
+      "TRACEOrganization": "UIUC",
+      "DataAvailablePriorToRuntime": "Yes",
+      "DataAvailableAfterRuntime": "Yes",
+      "TROIncludesOutputs": "Yes",
+      "TROIncludesCode": "Yes",
+      "NetworkIsolation": "Yes",
+      "PreventsAuthorInteraction": "Yes",
+      "InputsFromRepository": "No",
+      "TracksIntermediateSteps": "No",
+      "IntermediateStepsLevel": "0",
+      "RuntimeEvidence": "Yes"
+   }
+
+   # Start server. Note, you may need to configure .gpg path
    docker-compose up  # needs v2.x
 
    # Clone example
-   git clone https://github.com/labordynamicsinstitute/example-R-nodata
-   cd example-R-nodata
+   git clone https://github.com/labordynamicsinstitute/example-R-wdata
+   cd example-R-wdata
 
    # Submit the run
-   trace-poc submit .
+   trace-poc submit --entrypoint "run.sh" --container-user rstudio --target-repo-dir "/home/rstudio" .
+
+   ...
+   🤘 Finished running
+   👛 Baging result
+   📜 Signing the bag
+   📩 Your magic bag is available as: 659d6ab9-2960-4d1f-8b44-9d41068d4095_run.zip!
+   💣 Done!!!
 
    # Download the TRO
-   trace-poc download <run-id>
+   trace-poc download <run-name>
+
+   Run downloaded as /tmp/<run-name>_run.zip
 
    # Inspect the TRO
    trace-pos inspect <download-path>
 
-   🔍 Inspecting /tmp/a9fc5aa5-b6bf-463a-8477-343f15ab53b9_run.zip
+   🔍 Inspecting /tmp/<run-name>_run.zip
 	 ⭐ Bagging-Date - 2022-11-06
 	 ⭐ Bagging-Time - 15:30:52 UTC
 	 ⭐ DataAvailableAfterRuntime - Yes
