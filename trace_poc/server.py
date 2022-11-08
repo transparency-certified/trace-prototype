@@ -157,7 +157,7 @@ def _get_manifest_hash(path):
 
 def generate_tro(payload_zip, temp_dir):
     """Part of the workflow generating TRO..."""
-    yield "\U0001F45B Baging result\n"
+    yield "\U0001F45B Bagging result\n"
     bdb.make_bag(temp_dir, metadata=TRACE_CLAIMS.copy())
     payload_zip = f"{payload_zip[:-4]}_run"
     shutil.make_archive(payload_zip, "zip", temp_dir)
