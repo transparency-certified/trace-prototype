@@ -45,7 +45,14 @@ def main(debug):
     show_default=True,
     default="/home/jovyan/work",
 )
-def submit(path, direct, entrypoint, container_user, target_repo_dir):
+@click.option(
+    "--trace-server",
+    help="TRACE server to submit the job to.",
+    type=str,
+    show_default=True,
+    default="http://127.0.0.1:8000",
+)
+def submit(path, direct, entrypoint, container_user, target_repo_dir, trace_server):
     """Submit a job to a TRACE system."""
     path = os.path.abspath(path)
     if not os.path.isdir(path):
@@ -54,7 +61,7 @@ def submit(path, direct, entrypoint, container_user, target_repo_dir):
     if direct:
         click.echo(f"{path} will be passed directly")
         with requests.post(
-            "http://127.0.0.1:8000",
+            trace_server,
             params={
                 "entrypoint": entrypoint,
                 "path": path,
@@ -69,7 +76,7 @@ def submit(path, direct, entrypoint, container_user, target_repo_dir):
         with tempfile.NamedTemporaryFile(suffix=".zip") as tmp:
             make_archive(tmp.name[:-4], "zip", os.path.abspath(path))
             with requests.post(
-                "http://127.0.0.1:8000",
+                trace_server,
                 params={
                     "entrypoint": entrypoint,
                     "containerUser": container_user,
@@ -86,9 +93,16 @@ def submit(path, direct, entrypoint, container_user, target_repo_dir):
 
 @main.command()
 @click.argument("path", type=str)
-def download(path):
+@click.option(
+    "--trace-server",
+    help="TRACE server to submit the job to.",
+    type=str,
+    show_default=True,
+    default="http://127.0.0.1:8000",
+)
+def download(path, trace_server):
     """Download an exisiting zipball with a run."""
-    with requests.get(f"http://127.0.0.1:8000/run/{path}", stream=True) as response:
+    with requests.get(f"{trace_server}/run/{path}", stream=True) as response:
         response.raise_for_status()
         with open(os.path.join("/tmp", path), "wb") as fp:
             for chunk in response.iter_content(chunk_size=8192):
@@ -98,10 +112,17 @@ def download(path):
 
 @main.command()
 @click.argument("path", type=click.Path(exists=True))
-def verify(path):
+@click.option(
+    "--trace-server",
+    help="TRACE server to submit the job to.",
+    type=str,
+    show_default=True,
+    default="http://127.0.0.1:8000",
+)
+def verify(path, trace_server):
     """Verify that a run is valid and signed."""
     with requests.post(
-        "http://127.0.0.1:8000/verify",
+        f"{trace_server}/verify",
         files={"file": (os.path.basename(path), open(path, "rb"))},
         stream=True,
     ) as response:
