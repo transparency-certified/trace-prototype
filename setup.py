@@ -52,6 +52,9 @@ setup(
     keywords="trace_poc",
     name="trace_poc",
     packages=find_packages(include=["trace_poc", "trace_poc.*"]),
+    package_data={
+        "trace_poc": ["templates/*", "static/*"],
+    },
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/Xarthisius/trace_poc",

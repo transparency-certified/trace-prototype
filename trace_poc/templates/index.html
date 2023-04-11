@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>TRACE Server</title>
+</head>
+<body>
+<h1>This is a TRACE Server</h1>
+<p>Trace Server ID: {{ trace_server_id }}</p>
+<p>Trace Server Fingerprint: {{ trace_server_public_key }}</p>
+{% for fname in fnames %}
+  <div style="padding: 10px; background-color: #EEE; margin: 10px">
+    <ul>
+      <li>TRO Signature: <a href="/run/{{ fname }}.sig">{{ fname }}.sig</a></li>
+      <li>TRO Manifest: <a href="/run/{{ fname }}.json">{{ fname }}.json</a></li>
+      <li>TRO Payload: <a href="/run/{{ fname }}.zip">{{ fname }}.zip</a></li>
+    </ul>
+  </div>
+{% endfor %}
+</body>
+</html>

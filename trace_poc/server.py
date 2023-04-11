@@ -1,4 +1,5 @@
 """Main TRACE PoC API layer."""
+import datetime
 import hashlib
 import json
 import os
@@ -16,7 +17,7 @@ import gnupg
 import bagit
 from bdbag import bdbag_api as bdb
 import docker
-from flask import Flask, stream_with_context, request, send_from_directory
+from flask import Flask, stream_with_context, request, send_from_directory, render_template
 
 app = Flask(__name__)
 TMP_PATH = os.path.join(os.environ.get("HOSTDIR", "/"), "tmp")
@@ -42,6 +43,10 @@ try:
     GPG_KEYID = gpg.list_keys().key_map[GPG_FINGERPRINT]["keyid"]
 except KeyError:
     raise RuntimeError("Configured GPG_FINGERPRINT not found.")
+
+TRACE_CLAIMS["id"] = "https://trace-poc.xyz/"
+TRACE_CLAIMS["gpg_keyid"] = GPG_KEYID
+TRACE_CLAIMS["gpg_fingerprint"] = GPG_FINGERPRINT
 
 
 def build_image(payload_zip, temp_dir, image):
@@ -155,19 +160,79 @@ def _get_manifest_hash(path):
     return manifest_hash
 
 
+def _get_fingerprint(path):
+    """
+    Reads manifest-md5.txt and computes a payload fingerprint.
+
+    A payload fingerprint is a digest over a concatenation of the sorted digests of
+    the individual digital artifacts and bitstreams comprising the TRO payload.
+    """
+    with open(f"{path}/manifest-md5.txt", "rb") as fp:
+        digests = sorted([line.split()[0] for line in fp])
+    return hashlib.md5(b"".join(digests)).hexdigest()
+
+
+def _generate_manifest(path):
+    """
+    Generates a TRO manifest file for the TRO payload.
+
+    A TRO manifest file is a JSON file that MUST contain the following:
+        - a payload fingerprint
+        - the unique id and public key of Trace System (TRS) that produced the TRO
+        - an Authorized Digital Time Stamp (ADTS) of the TRO
+
+    A TRO manifest file MAY contain the following:
+        - TRACE-vocabulary expressed claims about the associated TRS.
+        - TRACE-vocabulary expressed claims about this specific TRO.
+        - Identification of the individual digital artifacts and
+          bitstreams comprising the TRO payload
+    """
+    now = datetime.datetime.now().isoformat()
+    manifest = {
+        "fingerprint": _get_fingerprint(path),
+        "trace_system": {
+            "id": "https://trace-poc.xyz/",
+            "public_key": GPG_FINGERPRINT,
+        },
+        "adts": {
+            "timestamp": now,
+            "public_key": GPG_FINGERPRINT,
+            "signature": str(
+                gpg.sign(now, keyid=GPG_KEYID, passphrase=GPG_PASSPHRASE, detach=True)
+            ),
+        },
+        "trs_trace_claims": TRACE_CLAIMS.copy(),
+        "tro_trace_claims": {},
+        "manifest": []
+    }
+    with open(f"{path}/manifest-md5.txt", "r") as fp:
+        for line in fp:
+            digest, path = line.strip().split("  ")
+            manifest["manifest"].append({"path": path, "md5": digest})
+    return manifest
+
+
 def generate_tro(payload_zip, temp_dir):
     """Part of the workflow generating TRO..."""
     yield "\U0001F45B Bagging result\n"
     bdb.make_bag(temp_dir, metadata=TRACE_CLAIMS.copy())
-    payload_zip = f"{payload_zip[:-4]}_run"
-    shutil.make_archive(payload_zip, "zip", temp_dir)
-    digest = _get_manifest_hash(temp_dir).hexdigest().encode()
+    yield "\U0001F4C2 Computing digests\n"
+    tro_manifest = _generate_manifest(temp_dir)
+    yield "\U0001F4C2 Signing the manifest\n"
+    tro_signature = gpg.sign(
+        json.dumps(tro_manifest), keyid=GPG_KEYID, passphrase=GPG_PASSPHRASE, detach=True
+    )
+
+    storage_dir = os.path.dirname(payload_zip)
+    basename = os.path.basename(payload_zip)[:-4]
+    yield "\U0001F4C2 Writing the manifest\n"
+    with open(f"{storage_dir}/{basename}.json", "w") as fp:
+        json.dump(tro_manifest, fp, indent=2)
+    with open(f"{storage_dir}/{basename}.sig", "w") as fp:
+        fp.write(str(tro_signature))
+    yield "\U0001F4C2 Zipping the bag\n"
+    shutil.make_archive(payload_zip, "zip", os.path.join(temp_dir, "data"))
     shutil.rmtree(temp_dir)
-    yield "\U0001F4DC Signing the bag\n"
-    with zipfile.ZipFile(f"{payload_zip}.zip", mode="a") as zf:
-        zf.comment = str(
-            gpg.sign(digest, keyid=GPG_KEYID, passphrase=GPG_PASSPHRASE, detach=False)
-        ).encode()
     yield (
         "\U0001F4E9 Your magic bag is available as: "
         f"{os.path.basename(payload_zip)}.zip!\n"
@@ -201,6 +266,17 @@ def magic(payload_zip, image=None):
     yield from run(temp_dir, image)
     yield from generate_tro(payload_zip, temp_dir)
     yield "\U0001F4A3 Done!!!"
+
+
+@app.route("/", methods=["GET"])
+def default_html_index():
+    """Default index page."""
+    data = {
+        "trace_server_id": "https://trace-poc.xyz",
+        "trace_server_public_key": GPG_FINGERPRINT,
+        "fnames": [_[:-4] for _ in os.listdir(STORAGE_PATH) if _.endswith(".sig")],
+    }
+    return render_template("index.html", **data)
 
 
 @app.route("/", methods=["POST"])

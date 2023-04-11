@@ -1,5 +1,7 @@
 volumes/certs/*
 volumes/storage/*.zip
+volumes/storage/*.sig
+volumes/storage/*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
