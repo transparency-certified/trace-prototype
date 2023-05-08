@@ -44,7 +44,7 @@ try:
 except KeyError:
     raise RuntimeError("Configured GPG_FINGERPRINT not found.")
 
-TRACE_CLAIMS["id"] = "https://trace-poc.xyz/"
+TRACE_CLAIMS["id"] = "https://server.trace-poc.xyz/"
 TRACE_CLAIMS["gpg_keyid"] = GPG_KEYID
 TRACE_CLAIMS["gpg_fingerprint"] = GPG_FINGERPRINT
 
@@ -191,7 +191,7 @@ def _generate_manifest(path):
     manifest = {
         "fingerprint": _get_fingerprint(path),
         "trace_system": {
-            "id": "https://trace-poc.xyz/",
+            "id": "https://server.trace-poc.xyz/",
             "public_key": GPG_FINGERPRINT,
         },
         "adts": {
@@ -272,7 +272,7 @@ def magic(payload_zip, image=None):
 def default_html_index():
     """Default index page."""
     data = {
-        "trace_server_id": "https://trace-poc.xyz",
+        "trace_server_id": "https://server.trace-poc.xyz",
         "trace_server_public_key": GPG_FINGERPRINT,
         "fnames": [_[:-4] for _ in os.listdir(STORAGE_PATH) if _.endswith(".sig")],
     }
