@@ -235,7 +235,7 @@ def _generate_declaration(bag_after, bag_before, zipname, start_time, end_time):
 
     arrangements = []
     for iarr, arrangement in enumerate(("Initial arrangement", "Final arrangement")):
-        iseq = 1
+        iseq = 0
         locus = []
         for artifact in hasArtifacts:
             if iarr in artifacts[artifact["trov:sha256"]]:
@@ -249,6 +249,7 @@ def _generate_declaration(bag_after, bag_before, zipname, start_time, end_time):
                         "trov:hasLocation": artifacts[artifact["trov:sha256"]][iarr],
                     }
                 )
+                iseq += 1
 
         arrangements.append(
             {
