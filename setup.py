@@ -18,6 +18,8 @@ requirements = [
     "docker>=2.3.0",
     "bdbag",
     "python-gnupg",
+    "python-magic",
+    "rfc3161ng",
 ]
 
 test_requirements = [
