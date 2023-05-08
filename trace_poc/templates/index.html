@@ -3,11 +3,45 @@
 <head>
   <meta charset="utf-8">
   <title>TRACE Server</title>
+  <style>
+    body {
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: .9em;
+      margin-left: 50px;
+      margin-right: 50px;
+    }
+    h1, h2 { 
+      font-weight: normal;
+      color: #000000;
+    }
+
+    #header {
+        padding:10px 0;
+    }
+    #header img {
+        vertical-align: middle;
+        margin-right:10px;
+        margin-bottom:5px;
+    }
+    #header h2 {margin: 0;}
+  </style>
 </head>
 <body>
-<h1>This is a TRACE Server</h1>
-<p>Trace Server ID: {{ trace_server_id }}</p>
-<p>Trace Server Fingerprint: {{ trace_server_public_key }}</p>
+
+<div id="header">
+<h2><img style="display: inline-block; {vertical-align:middle" src="https://transparency-certified.github.io/trace-specification/_static/logo.png" height="40px"/>Transparency Certified</h2>
+</div>
+
+<p>
+This prototype TRACE Server is intended to demonstrate the basic capabilities of
+a TRACE-enabled system.  For more information, see the <a
+href="https://github.com/transparency-certified/trace-prototype">TRACE
+Prototype</a> repository.
+</p>
+
+
+<p>The following Transparent Research Objects have been created by this server:</p>
+<div>
 {% for fname in fnames %}
   <div style="padding: 10px; background-color: #EEE; margin: 10px">
     <ul>
@@ -17,5 +51,11 @@
     </ul>
   </div>
 {% endfor %}
+
+<hr height="1px"/>
+<p><b>Trace Server ID</b>: {{ trace_server_id }}</p>
+<p><b>Trace Server Fingerprint</b>: {{ trace_server_public_key }}</p>
+
+</div>
 </body>
 </html>
