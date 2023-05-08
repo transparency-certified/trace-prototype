@@ -1,6 +1,6 @@
-=========
-TRACE POC
-=========
+===============
+TRACE PROTOTYPE
+===============
 
 
 .. image:: https://img.shields.io/pypi/v/trace_poc.svg
@@ -14,10 +14,7 @@ TRACE POC
         :alt: Documentation Status
 
 
-
-
-Proposed end-to-end prototype for TRACE project design discussions
-
+End-to-end prototype for TRACE projet design discussions.
 
 * Free software: BSD license
 * Documentation: https://trace-poc.readthedocs.io.
@@ -47,11 +44,6 @@ How to run?
 
 .. code-block::
  
-   # for client
-   virtualenv -p /usr/bin/python3 venv
-   . ./venv/bin/activate
-   pip install .
-
 
    # Generate GPG key
    gpg --full-generate-key
@@ -83,9 +75,20 @@ How to run?
    # Start server. Note, you may need to configure .gpg path
    docker-compose up  # needs v2.x
 
+Running via Command Line
+------------------------
+
+.. code-block::
+
+   # for client
+   virtualenv -p /usr/bin/python3 venv
+   . ./venv/bin/activate
+   pip install .
+
+
    # Clone example
-   git clone https://github.com/labordynamicsinstitute/example-R-wdata
-   cd example-R-wdata
+   git clone https://github.com/labordynamicsinstitute/sample-trace-workflow
+   cd sample-trace-workflow
 
    # Submit the run
    trace-poc submit --entrypoint "run.sh" --container-user rstudio --target-repo-dir "/home/rstudio" .
@@ -143,6 +146,20 @@ How to run?
     gpg: Signature made Sun Nov  6 15:30:52 2022 UTC
     gpg:                using RSA key 9C71A9331A94D28DA4D56A98F35DE0EBFE748EC4
     gpg: Good signature from "TRACE POC (TRACE System Proof of Concept) <trace-poc@gmail.com>" [ultimate]
+
+
+Running via Github Actions
+--------------------------
+
+The
+[sample-trace-workflow](https://github.com/transparency-certified/sample-trace-workflow)
+repository demonstrates how a TRACE system could be used via Github Actions. In
+this case, the prototype server is hosted externally
+https://server.trace-poc.xyz and the `trace-poc` CLI is used to submit jobs on
+push. See the [complete
+workflow](https://github.com/transparency-certified/sample-trace-workflow/blob/main/.github/workflows/compute.yml)
+for more information.
+
 
 Credits
 -------
