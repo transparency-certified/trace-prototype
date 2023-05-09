@@ -102,12 +102,14 @@ def submit(path, direct, entrypoint, container_user, target_repo_dir, trace_serv
 )
 def download(path, trace_server):
     """Download an exisiting zipball with a run."""
-    with requests.get(f"{trace_server}/run/{path}", stream=True) as response:
-        response.raise_for_status()
-        with open(os.path.join("/tmp", path), "wb") as fp:
-            for chunk in response.iter_content(chunk_size=8192):
-                fp.write(chunk)
-    click.echo(f"Run downloaded as /tmp/{path}")
+    tmpdir = tempfile.mkdtemp()
+    for ext in (".sig", ".jsonld", "_run.zip", ".tsr"):
+        with requests.get(f"{trace_server}/run/{path}{ext}", stream=True) as response:
+            response.raise_for_status()
+            with open(os.path.join(tmpdir, f"{path}{ext}"), "wb") as fp:
+                for chunk in response.iter_content(chunk_size=8192):
+                    fp.write(chunk)
+    click.echo(f"Run downloaded to {tmpdir}")
 
 
 @main.command()
