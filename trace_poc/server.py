@@ -320,7 +320,7 @@ def generate_tro(payload_zip, temp_dir, initial_dir, start_time, end_time):
     )
     yield "\U0001F4C2 Signing the manifest\n"
     trs_signature = gpg.sign(
-        json.dumps(tro_declaration),
+        json.dumps(tro_declaration, indent=2, sort_keys=True),
         keyid=GPG_KEYID,
         passphrase=GPG_PASSPHRASE,
         detach=True,
@@ -328,14 +328,14 @@ def generate_tro(payload_zip, temp_dir, initial_dir, start_time, end_time):
 
     yield "\U0001F4C2 Writing the manifest\n"
     with open(f"{storage_dir}/{basename}.jsonld", "w") as fp:
-        json.dump(tro_declaration, fp, indent=2)
+        json.dump(tro_declaration, fp, indent=2, sort_keys=True)
     with open(f"{storage_dir}/{basename}.sig", "w") as fp:
         fp.write(str(trs_signature))
     yield "\U0001F553 Timestamping the TRO Declaration and TRS Signature\n"
     rt = rfc3161ng.RemoteTimestamper("https://freetsa.org/tsr", hashname="sha512")
     ts_data = {
         "tro_declaration": hashlib.sha512(
-            json.dumps(tro_declaration).encode("utf-8")
+            json.dumps(tro_declaration, indent=2, sort_keys=True).encode("utf-8")
         ).hexdigest(),
         "trs_signature": hashlib.sha512(str(trs_signature).encode("utf-8")).hexdigest(),
     }
