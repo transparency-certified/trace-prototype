@@ -239,6 +239,7 @@ def _generate_declaration(bag_after, bag_before, zipname, start_time, end_time):
         locus = []
         for artifact in hasArtifacts:
             if iarr in artifacts[artifact["trov:sha256"]]:
+                # hasLocation needs to exclude the bag's "data/" prefix
                 locus.append(
                     {
                         "@id": f"arrangement/{iarr}/locus/{iseq}",
@@ -246,7 +247,7 @@ def _generate_declaration(bag_after, bag_before, zipname, start_time, end_time):
                         "trov:hasArtifact": {
                             "@id": artifact["@id"],
                         },
-                        "trov:hasLocation": artifacts[artifact["trov:sha256"]][iarr],
+                        "trov:hasLocation": artifacts[artifact["trov:sha256"]][iarr][5:],
                     }
                 )
                 iseq += 1
