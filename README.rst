@@ -151,13 +151,13 @@ Running via Command Line
 Running via Github Actions
 --------------------------
 
-The
-[sample-trace-workflow](https://github.com/transparency-certified/sample-trace-workflow)
+`sample-trace-workflow
+<https://github.com/transparency-certified/sample-trace-workflow>`_
 repository demonstrates how a TRACE system could be used via Github Actions. In
 this case, the prototype server is hosted externally
 https://server.trace-poc.xyz and the `trace-poc` CLI is used to submit jobs on
-push. See the [complete
-workflow](https://github.com/transparency-certified/sample-trace-workflow/blob/main/.github/workflows/compute.yml)
+push. See the `complete workflow
+<https://github.com/transparency-certified/sample-trace-workflow/blob/main/.github/workflows/compute.yml>`_
 for more information.
 
 
