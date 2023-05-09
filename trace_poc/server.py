@@ -19,8 +19,14 @@ import gnupg
 import magic
 import rfc3161ng
 from bdbag import bdbag_api as bdb
-from flask import (Flask, render_template, request, send_from_directory,
-                   stream_with_context)
+from flask import (
+    Flask,
+    render_template,
+    request,
+    send_from_directory,
+    stream_with_context,
+    Response,
+)
 from pyasn1.codec.der import encoder
 
 app = Flask(__name__)
@@ -247,7 +253,9 @@ def _generate_declaration(bag_after, bag_before, zipname, start_time, end_time):
                         "trov:hasArtifact": {
                             "@id": artifact["@id"],
                         },
-                        "trov:hasLocation": artifacts[artifact["trov:sha256"]][iarr][5:],
+                        "trov:hasLocation": artifacts[artifact["trov:sha256"]][iarr][
+                            5:
+                        ],
                     }
                 )
                 iseq += 1
@@ -440,6 +448,12 @@ def handler():
 def send_run(path):
     """Serve static files from storage dir."""
     return send_from_directory(STORAGE_PATH, path)
+
+
+@app.route("/pubkey", methods=["GET"])
+def send_pubkey():
+    """Export server's gpg key as a file."""
+    return Response(gpg.export_keys(GPG_KEYID), mimetype="text/plain")
 
 
 @app.route("/verify", methods=["POST"])
