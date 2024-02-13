@@ -352,6 +352,12 @@ def generate_tro(payload_zip, temp_dir, initial_dir, start_time, end_time):
         fs.write(encoder.encode(tsr))
     yield "\U0001F4C2 Zipping the bag\n"
     result_zip = os.path.join(storage_dir, f"{basename}_run")
+    if ignore_files := os.path.join(temp_dir, "data", ".dockerignore"):
+        for ignore_file in open(ignore_files, "r").readlines():
+            try:
+                os.remove(os.path.join(temp_dir, "data", ignore_file.strip()))
+            except FileNotFoundError:
+                pass
     shutil.make_archive(result_zip, "zip", os.path.join(temp_dir, "data"))
     shutil.rmtree(temp_dir)
     yield (
