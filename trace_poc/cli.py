@@ -52,7 +52,22 @@ def main(debug):
     show_default=True,
     default="http://127.0.0.1:8000",
 )
-def submit(path, direct, entrypoint, container_user, target_repo_dir, trace_server):
+@click.option(
+    "--enable-network",
+    help="Disable network isolation for the run.",
+    is_flag=True,
+    default=False,
+    show_default=True,
+)
+def submit(
+    path,
+    direct,
+    entrypoint,
+    container_user,
+    target_repo_dir,
+    trace_server,
+    enable_network,
+):
     """Submit a job to a TRACE system."""
     path = os.path.abspath(path)
     if not os.path.isdir(path):
@@ -67,6 +82,7 @@ def submit(path, direct, entrypoint, container_user, target_repo_dir, trace_serv
                 "path": path,
                 "containerUser": container_user,
                 "targetRepoDir": target_repo_dir,
+                "networkEnabled": enable_network,
             },
             stream=True,
         ) as response:
@@ -81,6 +97,7 @@ def submit(path, direct, entrypoint, container_user, target_repo_dir, trace_serv
                     "entrypoint": entrypoint,
                     "containerUser": container_user,
                     "targetRepoDir": target_repo_dir,
+                    "networkEnabled": enable_network,
                 },
                 files={"file": ("random.zip", tmp)},
                 stream=True,

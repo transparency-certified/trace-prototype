@@ -108,7 +108,7 @@ def run(temp_dir, image):
         image=image["tag"],
         command=f"sh {image['entrypoint']}",
         detach=True,
-        network_disabled=True,
+        network_disabled=not image["network_enabled"],
         user=image["container_user"],
         working_dir=image["target_repo_dir"],
         volumes={
@@ -168,7 +168,7 @@ def _get_manifest_hash(path):
     return manifest_hash
 
 
-def _generate_declaration(bag_after, bag_before, zipname, start_time, end_time):
+def _generate_declaration(bag_after, bag_before, zipname, start_time, end_time, image):
     """
     Generates a TRO declaration file for the TRO payload.
 
@@ -312,10 +312,19 @@ def _generate_declaration(bag_after, bag_before, zipname, start_time, end_time):
         },
     ]
 
+    if not image["network_enabled"]:
+        declaration["@graph"][0]["trov:hasPerformance"][
+            "trov:hadPerformanceAttribute"
+        ] = {
+            "@id": "trp/1/attribute/1",
+            "@type": "trov:InternetIsolation",
+            "trov:warrantedBy": {"@id": "trs/capability/1"},
+        }
+
     return declaration
 
 
-def generate_tro(payload_zip, temp_dir, initial_dir, start_time, end_time):
+def generate_tro(payload_zip, temp_dir, initial_dir, start_time, end_time, image):
     """Part of the workflow generating TRO..."""
     storage_dir = os.path.dirname(payload_zip)
     basename = os.path.basename(payload_zip)[:-4]
@@ -324,7 +333,7 @@ def generate_tro(payload_zip, temp_dir, initial_dir, start_time, end_time):
     bdb.make_bag(temp_dir, metadata=TRACE_CLAIMS.copy())
     yield "\U0001F4C2 Computing digests\n"
     tro_declaration = _generate_declaration(
-        temp_dir, initial_dir, basename, start_time, end_time
+        temp_dir, initial_dir, basename, start_time, end_time, image
     )
     yield "\U0001F4C2 Signing the manifest\n"
     trs_signature = gpg.sign(
@@ -412,7 +421,7 @@ def magic_workflow(path_to_zip, image=None):
     start_time = datetime.datetime.utcnow()
     yield from run(temp_dir, image)
     end_time = datetime.datetime.utcnow()
-    yield from generate_tro(path_to_zip, temp_dir, initial_dir, start_time, end_time)
+    yield from generate_tro(path_to_zip, temp_dir, initial_dir, start_time, end_time, image)
     yield "\U0001F4A3 Done!!!"
 
 
@@ -440,6 +449,9 @@ def handler():
     if "file" in request.files:
         request.files["file"].save(fname)
     image = {
+        "network_enabled": request.args.get(
+            "networkEnabled", default=False, type=bool
+        ),
         "entrypoint": request.args.get("entrypoint", default="run.sh", type=str),
         "container_user": request.args.get("containerUser", default="jovyan", type=str),
         "target_repo_dir": request.args.get(
