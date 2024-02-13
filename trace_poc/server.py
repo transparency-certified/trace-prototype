@@ -436,6 +436,10 @@ def default_html_index():
     return render_template("index.html", **data)
 
 
+def is_it_true(value):
+    return value.lower() == 'true'
+
+
 @app.route("/", methods=["POST"])
 def handler():
     """Either saves payload passed as body or accepts a path to a directory."""
@@ -450,7 +454,7 @@ def handler():
         request.files["file"].save(fname)
     image = {
         "network_enabled": request.args.get(
-            "networkEnabled", default=False, type=bool
+            "networkEnabled", default=False, type=is_it_true
         ),
         "entrypoint": request.args.get("entrypoint", default="run.sh", type=str),
         "container_user": request.args.get("containerUser", default="jovyan", type=str),
