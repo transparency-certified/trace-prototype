@@ -1,9 +1,12 @@
 """Console script for trace_poc."""
+import hashlib
+import json
 import os
-from shutil import make_archive
+import subprocess
 import sys
 import tempfile
 import zipfile
+from shutil import make_archive
 
 import click
 import requests
@@ -131,26 +134,61 @@ def download(path, trace_server):
 
 @main.command()
 @click.argument("path", type=click.Path(exists=True))
-@click.option(
-    "--trace-server",
-    help="TRACE server to submit the job to.",
-    type=str,
-    show_default=True,
-    default="http://127.0.0.1:8000",
-)
-def verify(path, trace_server):
+def verify(path):
     """Verify that a run is valid and signed."""
-    with requests.post(
-        f"{trace_server}/verify",
-        files={"file": (os.path.basename(path), open(path, "rb"))},
-        stream=True,
-    ) as response:
-        try:
-            response.raise_for_status()
-            for line in response.iter_lines(decode_unicode=True):
-                print(line)
-        except requests.exceptions.HTTPError as exc:
-            print(exc, response.text)
+    run_id = os.path.basename(path).split("_")[0]
+    with open(f"{run_id}.jsonld", "r") as fp:
+        tro_declaration = json.load(fp)
+    with open(f"{run_id}.sig", "rb") as fp:
+        trs_signature = fp.read()
+
+    ts_data = {
+        "tro_declaration": hashlib.sha512(
+            json.dumps(tro_declaration, indent=2, sort_keys=True).encode("utf-8")
+        ).hexdigest(),
+        "trs_signature": hashlib.sha512(trs_signature).hexdigest(),
+    }
+    tsr_payload = json.dumps(ts_data, indent=2, sort_keys=True).encode()
+
+    with (
+        tempfile.NamedTemporaryFile() as data_f,
+        tempfile.NamedTemporaryFile() as cafile_f,
+        tempfile.NamedTemporaryFile() as tsacert_f,
+    ):
+        data_f.write(tsr_payload)
+        data_f.flush()
+        data_f.seek(0)
+
+        # Download the TSA certificate
+        response = requests.get(
+            "https://freetsa.org/files/tsa.crt", allow_redirects=True
+        )
+        tsacert_f.write(response.content)
+        tsacert_f.flush()
+        tsacert_f.seek(0)
+
+        # Download the CA certificate
+        response = requests.get(
+            "https://freetsa.org/files/cacert.pem", allow_redirects=True
+        )
+        cafile_f.write(response.content)
+        cafile_f.flush()
+        cafile_f.seek(0)
+
+        args = [
+            "openssl",
+            "ts",
+            "-verify",
+            "-data",
+            data_f.name,
+            "-in",
+            f"{run_id}.tsr",
+            "-CAfile",
+            cafile_f.name,
+            "-untrusted",
+            tsacert_f.name,
+        ]
+        subprocess.check_call(args)
 
 
 @main.command()

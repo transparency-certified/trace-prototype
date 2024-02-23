@@ -21,11 +21,11 @@ import rfc3161ng
 from bdbag import bdbag_api as bdb
 from flask import (
     Flask,
+    Response,
     render_template,
     request,
     send_from_directory,
     stream_with_context,
-    Response,
 )
 from pyasn1.codec.der import encoder
 
@@ -49,7 +49,7 @@ else:
     TRACE_CLAIMS = json.load(open(TRACE_CLAIMS_FILE, "r"))
 
 try:
-    gpg = gnupg.GPG(gnupghome=GPG_HOME)
+    gpg = gnupg.GPG(gnupghome=GPG_HOME, verbose=False)
     GPG_KEYID = gpg.list_keys().key_map[GPG_FINGERPRINT]["keyid"]
 except KeyError:
     raise RuntimeError("Configured GPG_FINGERPRINT not found.")
@@ -356,12 +356,14 @@ def generate_tro(payload_zip, temp_dir, initial_dir, start_time, end_time, image
         ).hexdigest(),
         "trs_signature": hashlib.sha512(str(trs_signature).encode("utf-8")).hexdigest(),
     }
-    tsr = rt(data=json.dumps(ts_data).encode(), return_tsr=True)
+    tsr_payload = json.dumps(ts_data, indent=2, sort_keys=True).encode()
+    tsr = rt(data=tsr_payload, return_tsr=True)
     with open(f"{storage_dir}/{basename}.tsr", "wb") as fs:
         fs.write(encoder.encode(tsr))
     yield "\U0001F4C2 Zipping the bag\n"
     result_zip = os.path.join(storage_dir, f"{basename}_run")
-    if ignore_files := os.path.join(temp_dir, "data", ".dockerignore"):
+    ignore_files = os.path.join(temp_dir, "data", ".dockerignore")
+    if os.path.isfile(ignore_files):
         for ignore_file in open(ignore_files, "r").readlines():
             try:
                 os.remove(os.path.join(temp_dir, "data", ignore_file.strip()))
@@ -421,7 +423,9 @@ def magic_workflow(path_to_zip, image=None):
     start_time = datetime.datetime.utcnow()
     yield from run(temp_dir, image)
     end_time = datetime.datetime.utcnow()
-    yield from generate_tro(path_to_zip, temp_dir, initial_dir, start_time, end_time, image)
+    yield from generate_tro(
+        path_to_zip, temp_dir, initial_dir, start_time, end_time, image
+    )
     yield "\U0001F4A3 Done!!!"
 
 
@@ -437,7 +441,7 @@ def default_html_index():
 
 
 def is_it_true(value):
-    return value.lower() == 'true'
+    return value.lower() == "true"
 
 
 @app.route("/", methods=["POST"])
